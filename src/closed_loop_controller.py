@@ -57,13 +57,8 @@ class control:
         pwm = self.gain*(self.setpoint - actual)
         return pwm
     
-    def cl_loop_response(self, motor, encoder, controller):
+    def cl_loop_response(self, motor, encoder, controller, position):
         
-        controller.set_setpoint()
-        controller.set_Kp()
-        encoder.zero()
-        position = []
-
         try:
             # Continously runs the step response with a delay of 10 ms ...
             actual = encoder.read()
@@ -71,19 +66,22 @@ class control:
             motor.set_duty_cycle(duty_cycle)
             position.append(actual)
             utime.sleep_ms(10)
+            
             # ... until the set motor position is reached
             if abs(duty_cycle) <= 10:
                 # Appends the current encoder value 100 times for plotting purposes
-                for i in range(100):
+                for i in range(50):
                     position.append(actual)
                     utime.sleep_ms(10)
                     
                 # Grabs initial time
                 init_time = utime.ticks_ms()
                 
+                timing = 0
                 # Prints time and encoder position in .CSV style format
                 for i in position:
-                    print(f"{utime.ticks_ms() - init_time},{i}")
+                    print(f"{timing},{i}")
+                    timing += 10
                     utime.sleep_ms(9)
                 
                 # Prints end once the code is done running through 
@@ -91,7 +89,6 @@ class control:
                 
                 # Clears position list
                 position.clear()
-                utime.sleep_ms(9)
                 
                 # Asks for another Kp value and zeros encoder
                 controller.set_Kp()
@@ -104,9 +101,7 @@ class control:
             motor.set_duty_cycle(duty_cycle)
             position.append(0)
             utime.sleep_ms(10)
-
-    
-        
+            
 
 if __name__ == "__main__":
     # Code needed to initalize motor
@@ -144,8 +139,14 @@ if __name__ == "__main__":
     
     # Initializes Motor Controller
     controller = control()
+       
+    controller.set_setpoint()
+    controller.set_Kp()
+    position = []
+    encoder.zero()
     
-    controller.cl_loop_response(motor, encoder, controller)
+    while True:
+        controller.cl_loop_response(motor, encoder, controller, position)
     
     # Prompts user to input a controller gain
     # Initializes variables to be used in the while loop

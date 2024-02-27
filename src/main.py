@@ -67,52 +67,12 @@ def task1_fun(shares):
     
     controller.set_setpoint()
     controller.set_Kp()
-    encoder.zero()
     position = []
+    encoder.zero()
     
     while True:
-        try:
-            # Continously runs the step response with a delay of 10 ms ...
-            actual = encoder.read()
-            duty_cycle = controller.run(actual)
-            motor.set_duty_cycle(duty_cycle)
-            position.append(actual)
-#             utime.sleep_ms(10)
-            # ... until the set motor position is reached
-            if abs(duty_cycle) <= 10:
-                # Appends the current encoder value 100 times for plotting purposes
-                for i in range(100):
-                    position.append(actual)
-#                     utime.sleep_ms(10)
-                    
-                # Grabs initial time
-                init_time = utime.ticks_ms()
-                
-                # Prints time and encoder position in .CSV style format
-                for i in position:
-                    print(f"{utime.ticks_ms() - init_time},{i}")
-                    utime.sleep_ms(9)
-                
-                # Prints end once the code is done running through 
-                print('end')
-                
-                # Clears position list
-                position.clear()
-                utime.sleep_ms(9)
-                
-                # Asks for another Kp value and zeros encoder
-                controller.set_Kp()
-                encoder.zero()
+        controller.cl_loop_response(motor, encoder, controller, position)
         
-        # This portion only runs the first time through
-        # This makes the motor run initially
-        except TypeError:
-            duty_cycle = controller.run(0)
-            motor.set_duty_cycle(duty_cycle)
-            position.append(0)
-#             utime.sleep_ms(10)
-
-
         yield 0
 
 
@@ -124,13 +84,49 @@ def task2_fun(shares):
     # Get references to the share and queue which have been passed to this task
     the_share, the_queue = shares
 
+    en_pin = pyb.Pin(pyb.Pin.board.PC1, mode = pyb.Pin.OPEN_DRAIN, pull = pyb.Pin.PULL_UP, value = 1)
+    a_pin = pyb.Pin(pyb.Pin.board.PA0, pyb.Pin.OUT_PP)
+    another_pin = pyb.Pin(pyb.Pin.board.PA1, pyb.Pin.OUT_PP)
+    m_timer = pyb.Timer(5, freq=5000)
+    chm1 = m_timer.channel(1, pyb.Timer.PWM, pin=a_pin)
+    chm2 = m_timer.channel(2, pyb.Timer.PWM, pin=another_pin)
+    
+    # Motor Initialization done through imported MotorDriver class
+    motor_2 = moe.MotorDriver(en_pin,a_pin,another_pin,m_timer,chm1,chm2)
+    
+    # Code needed to initialize encoder. Set 'tim' to the correct timer
+    # for the pins being used.
+    tim = 4
+    timer = pyb.Timer(tim, prescaler = 0, period = 65535)
+    
+    # Depending on the timer used, the code will autometically
+    # initalize the correct channel and pins. For example, if the timer
+    # used is '4', then the B6/B7 pins will be initialized. In this test code,
+    # C6/C7 is used.
+    if tim == 4:
+        ch1 = timer.channel(1,pyb.Timer.ENC_A,pin = pyb.Pin.board.PB6)
+        ch2 = timer.channel(2, pyb.Timer.ENC_B,pin = pyb.Pin.board.PB7)
+    
+    elif tim == 8:
+        ch1 = timer.channel(1,pyb.Timer.ENC_A,pin = pyb.Pin.board.PC6)
+        ch2 = timer.channel(2, pyb.Timer.ENC_B,pin = pyb.Pin.board.PC7)
+    else:
+        print("invalid timer")
+    
+    # Initializes Encoder
+    encoder_2 = enc.encoder(timer,ch1,ch2)          
+    
+    # Initializes Motor Controller
+    controller_2 = closed.control()
+    
+    controller_2.set_setpoint()
+    controller_2.set_Kp()
+    position_2 = []
+    encoder_2.zero()
+    
     while True:
-        # Show everything currently in the queue and the value in the share
-        print(f"Share: {the_share.get ()}, Queue: ", end='')
-        while q0.any():
-            print(f"{the_queue.get ()} ", end='')
-        print('')
-
+        controller_2.cl_loop_response(motor_2, encoder_2, controller_2, position_2)
+        
         yield 0
 
 
@@ -150,12 +146,12 @@ if __name__ == "__main__":
     # allocated for state transition tracing, and the application will run out
     # of memory after a while and quit. Therefore, use tracing only for 
     # debugging and set trace to False when it's not needed
-    task1 = cotask.Task(task1_fun, name="Task_1", priority=1, period=30,
+    task1 = cotask.Task(task1_fun, name="Task_1", priority=1, period=50,
                         profile=True, trace=False, shares=(share0, q0))
-#     task2 = cotask.Task(task2_fun, name="Task_2", priority=2, period=5000,
-#                          profile=True, trace=False, shares=(share0, q0))
+    task2 = cotask.Task(task2_fun, name="Task_2", priority=2, period=50,
+                         profile=True, trace=False, shares=(share0, q0))
     cotask.task_list.append(task1)
-#     cotask.task_list.append(task2)
+    cotask.task_list.append(task2)
 
     # Run the memory garbage collector to ensure memory is as defragmented as
     # possible before the real-time scheduler is started

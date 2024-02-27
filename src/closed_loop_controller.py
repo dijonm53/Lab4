@@ -64,48 +64,47 @@ class control:
         encoder.zero()
         position = []
 
-        while True:
-            try:
-                # Continously runs the step response with a delay of 10 ms ...
-                actual = encoder.read()
-                duty_cycle = controller.run(actual)
-                motor.set_duty_cycle(duty_cycle)
-                position.append(actual)
-                utime.sleep_ms(10)
-                # ... until the set motor position is reached
-                if abs(duty_cycle) <= 10:
-                    # Appends the current encoder value 100 times for plotting purposes
-                    for i in range(100):
-                        position.append(actual)
-                        utime.sleep_ms(10)
-                        
-                    # Grabs initial time
-                    init_time = utime.ticks_ms()
+        try:
+            # Continously runs the step response with a delay of 10 ms ...
+            actual = encoder.read()
+            duty_cycle = controller.run(actual)
+            motor.set_duty_cycle(duty_cycle)
+            position.append(actual)
+            utime.sleep_ms(10)
+            # ... until the set motor position is reached
+            if abs(duty_cycle) <= 10:
+                # Appends the current encoder value 100 times for plotting purposes
+                for i in range(100):
+                    position.append(actual)
+                    utime.sleep_ms(10)
                     
-                    # Prints time and encoder position in .CSV style format
-                    for i in position:
-                        print(f"{utime.ticks_ms() - init_time},{i}")
-                        utime.sleep_ms(9)
-                    
-                    # Prints end once the code is done running through 
-                    print('end')
-                    
-                    # Clears position list
-                    position.clear()
+                # Grabs initial time
+                init_time = utime.ticks_ms()
+                
+                # Prints time and encoder position in .CSV style format
+                for i in position:
+                    print(f"{utime.ticks_ms() - init_time},{i}")
                     utime.sleep_ms(9)
-                    
-                    # Asks for another Kp value and zeros encoder
-                    controller.set_Kp()
-                    encoder.zero()
-            
-            # This portion only runs the first time through
-            # This makes the motor run initially
-            except TypeError:
-                duty_cycle = controller.run(0)
-                motor.set_duty_cycle(duty_cycle)
-                position.append(0)
-                utime.sleep_ms(10)
-                continue
+                
+                # Prints end once the code is done running through 
+                print('end')
+                
+                # Clears position list
+                position.clear()
+                utime.sleep_ms(9)
+                
+                # Asks for another Kp value and zeros encoder
+                controller.set_Kp()
+                encoder.zero()
+        
+        # This portion only runs the first time through
+        # This makes the motor run initially
+        except TypeError:
+            duty_cycle = controller.run(0)
+            motor.set_duty_cycle(duty_cycle)
+            position.append(0)
+            utime.sleep_ms(10)
+
     
         
 

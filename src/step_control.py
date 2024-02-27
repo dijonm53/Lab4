@@ -75,7 +75,6 @@ def plot_example(plot_axes, plot_canvas, xlabel, ylabel, ser, x_values, y_values
             y_values.append(y_value)
             
         except ValueError:
-            print('error')
             continue
         
         except IndexError:
@@ -104,8 +103,8 @@ def tk_matplot(plot_function, xlabel, ylabel, title):
     """
     
     # Parameters for serial port
-    serial_port = '/dev/tty.usbmodem2070366F394E2'  
-    baud_rate = 9600
+    serial_port = 'COM3' 
+    baud_rate = 115200
     
     # Opens serial port
     ser = serial.Serial(serial_port, baud_rate, timeout=0.5)

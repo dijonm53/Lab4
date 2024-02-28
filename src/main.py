@@ -17,18 +17,17 @@ import task_share
 import encoder_reader as enc
 import motor_driver as moe
 import closed_loop_controller as closed
-import utime
-
-
 
 def task1_fun(shares):
     """!
-    Task which puts things into a share and a queue.
+    Task which runs the first motor using a scheduler. This function is run 
+    every period interval.
     @param shares A list holding the share and queue used by this task
     """
     # Get references to the share and queue which have been passed to this task
     my_share, my_queue = shares
 
+    # Stuff copied over from last lab below
     # Code needed to initalize motor
     en_pin = pyb.Pin(pyb.Pin.board.PA10, mode = pyb.Pin.OPEN_DRAIN, pull = pyb.Pin.PULL_UP, value = 1)
     a_pin = pyb.Pin(pyb.Pin.board.PB4, pyb.Pin.OUT_PP)
@@ -65,25 +64,30 @@ def task1_fun(shares):
     # Initializes Motor Controller
     controller = closed.control()
     
-    controller.set_setpoint()
-    controller.set_Kp()
-    position = []
+    # Sets gain and setpoint values and resets the encoder before running
+    # the step response
+    controller.set_setpoint(6900)
+    controller.set_Kp(0.1)
     encoder.zero()
     
+    # Running step response
     while True:
-        controller.cl_loop_response(motor, encoder, controller, position)
+        controller.cl_loop_response(motor, encoder, controller)
         
         yield 0
 
 
 def task2_fun(shares):
     """!
-    Task which takes things out of a queue and share and displays them.
+    Task which runs the second motor using a scheduler. This function is run 
+    every period interval.
     @param shares A tuple of a share and queue from which this task gets data
     """
     # Get references to the share and queue which have been passed to this task
     the_share, the_queue = shares
-
+    
+    # Stuff copied over from last lab below
+    # Code needed to initalize motor
     en_pin = pyb.Pin(pyb.Pin.board.PC1, mode = pyb.Pin.OPEN_DRAIN, pull = pyb.Pin.PULL_UP, value = 1)
     a_pin = pyb.Pin(pyb.Pin.board.PA0, pyb.Pin.OUT_PP)
     another_pin = pyb.Pin(pyb.Pin.board.PA1, pyb.Pin.OUT_PP)
@@ -119,23 +123,24 @@ def task2_fun(shares):
     # Initializes Motor Controller
     controller_2 = closed.control()
     
-    controller_2.set_setpoint()
-    controller_2.set_Kp()
-    position_2 = []
+    # Sets gain and setpoint values and resets the encoder before running
+    # the step response
+    controller_2.set_setpoint(6900)
+    controller_2.set_Kp(0.1)
     encoder_2.zero()
     
+    # Running step response
     while True:
-        controller_2.cl_loop_response(motor_2, encoder_2, controller_2, position_2)
+        controller_2.cl_loop_response(motor_2, encoder_2, controller_2)
         
         yield 0
+    
 
 
 # This code creates a share, a queue, and two tasks, then starts the tasks. The
 # tasks run until somebody presses ENTER, at which time the scheduler stops and
 # printouts show diagnostic information about the tasks, share, and queue.
 if __name__ == "__main__":
-    print("Testing ME405 stuff in cotask.py and task_share.py\r\n"
-          "Press Ctrl-C to stop and show diagnostics.")
 
     # Create a share and a queue to test function and diagnostic printouts
     share0 = task_share.Share('h', thread_protect=False, name="Share 0")
@@ -146,12 +151,12 @@ if __name__ == "__main__":
     # allocated for state transition tracing, and the application will run out
     # of memory after a while and quit. Therefore, use tracing only for 
     # debugging and set trace to False when it's not needed
-    task1 = cotask.Task(task1_fun, name="Task_1", priority=1, period=50,
+    task1 = cotask.Task(task1_fun, name="Task_1", priority=1, period=10,
                         profile=True, trace=False, shares=(share0, q0))
-    task2 = cotask.Task(task2_fun, name="Task_2", priority=2, period=50,
-                         profile=True, trace=False, shares=(share0, q0))
+#     task2 = cotask.Task(task2_fun, name="Task_2", priority=2, period=50,
+#                          profile=True, trace=False, shares=(share0, q0))
     cotask.task_list.append(task1)
-    cotask.task_list.append(task2)
+#     cotask.task_list.append(task2)
 
     # Run the memory garbage collector to ensure memory is as defragmented as
     # possible before the real-time scheduler is started

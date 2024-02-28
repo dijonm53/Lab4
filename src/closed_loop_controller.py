@@ -22,27 +22,40 @@ class control:
         """
         self.gain = 0
         self.setpoint = 0
+        
+        # Used for the step response function:
+        self.state = 0
+        self.steady_counter = 0
+        self.print_counter = 0
+        self.position = 0
     
-    def set_setpoint(self):
+    def set_setpoint(self, user_p):
         """! 
-        Setting the setpoint to be a fixed value for repeated testing.
+        Setting the setpoint to be a fixed value for repeated testing
+        @param user_p gain given by whatever is calling the function
         """
-        self.setpoint = 6900
+        self.setpoint = user_p
   
-    def set_Kp(self):
+    def set_Kp(self, user_p):
         """! 
-        Function that will prompt the user to input a desired gain,
-        includes an error handling case for ValueError(s)
+        Function that will set the gain for the proportional control loop
+        @param user_p gain given by the program
         """
-        while True:
-            try:
-                user_gain = input('Set ur gain:  ' )
-                self.gain = float(user_gain)
-                break
+        
+        # Sets controller gain to user_p
+        self.gain = float(user_p)
+        
+        # The code below was used for the previous iteration of this function, where
+        # it asked the user for a gain value
+        # while True:
+        #     try:
+        #         user_gain = input('Set ur gain:  ' )
+        #         self.gain = float(user_gain)
+        #         break
             
-            # In case of values other than ints or floats
-            except ValueError:
-                print("Invalid input. Please enter a valid float value.")  
+        #     # In case of values other than ints or floats
+        #     except ValueError:
+        #         print("Invalid input. Please enter a valid float value.")  
                 
     def run(self, actual):
         """!
@@ -57,50 +70,92 @@ class control:
         pwm = self.gain*(self.setpoint - actual)
         return pwm
     
-    def cl_loop_response(self, motor, encoder, controller, position):
-        
-        try:
-            # Continously runs the step response with a delay of 10 ms ...
-            actual = encoder.read()
-            duty_cycle = controller.run(actual)
-            motor.set_duty_cycle(duty_cycle)
-            position.append(actual)
-            utime.sleep_ms(10)
+    def cl_loop_response(self, motor, encoder, controller):
+        """!
+        Function that runs the step reponse for the motor. This function
+        implements a finite-state-machine and class variables to keep track of 
+        what the program needs to do. Near the end of the function, the program
+        prints the step response in .CSV-style format to plotting purposes.
+        @param motor motor driver object running the motor
+        @param encoder encoder object returning the position of the motor
+        @param controller controller object responsible for runnning functions within class
+        """
+        try:          
+            # State 0: Step-response
+            if self.state == 0:
+                # Continously runs the step response with a delay of 10 ms ...
+                actual = encoder.read()
+                duty_cycle = controller.run(actual)
+                motor.set_duty_cycle(duty_cycle)
+                self.position.append(actual)
+                # utime.sleep_ms(10)
             
             # ... until the set motor position is reached
-            if abs(duty_cycle) <= 10:
-                # Appends the current encoder value 100 times for plotting purposes
-                for i in range(50):
-                    position.append(actual)
-                    utime.sleep_ms(10)
+                if abs(duty_cycle) <= 10:
+                    # Sets next state
+                    self.state += 1
                     
+            # State 1: Step-Response Redundancy
+            # Places the ending value of the step response 10 times
+            # For cleaner plots
+            elif self.state == 1:
+                position.append(actual)
+                # utime.sleep_ms(10)
+                
+                # Counter for this state
+                self.steady_counter += 1
+                
+                # Sets next state once counter reaches it's limit
+                if self.steady_counter == 10:
+                    self.state += 1
+            
+            # State 2: Printing Step Response
+            elif self.state == 2:       
                 # Grabs initial time
                 init_time = utime.ticks_ms()
                 
-                timing = 0
                 # Prints time and encoder position in .CSV style format
-                for i in position:
-                    print(f"{timing},{i}")
-                    timing += 10
-                    utime.sleep_ms(9)
+                print(f"{utime.ticks_ms() - init_time},{self.position[self.print_counter]}")
                 
+                # Counter for this state
+                # Exits when printing raises an IndexError
+                self.print_counter += 1
+                
+                # utime.sleep_ms(9)
+            
+            # State 3:Ending
+            elif self.state == 3: 
                 # Prints end once the code is done running through 
+                # Indicates to GUI when to start plotting
                 print('end')
                 
                 # Clears position list
-                position.clear()
+                self.position.clear()
                 
-                # Asks for another Kp value and zeros encoder
-                controller.set_Kp()
+                # Sets Kp value
+                controller.set_Kp(0.1)
+                
+                # Zeros outs necessary values and parameters for next run 
+                # through
                 encoder.zero()
+                self.state = 0
+                self.print_counter = 0
+                self.steady_counter = 0
         
         # This portion only runs the first time through
         # This makes the motor run initially
         except TypeError:
             duty_cycle = controller.run(0)
             motor.set_duty_cycle(duty_cycle)
-            position.append(0)
-            utime.sleep_ms(10)
+            self.position.append(0)
+            # utime.sleep_ms(10)
+            
+        # Only runs when finished printing the step-response values
+        except IndexError:
+            self.state += 1
+        
+        # except ValueError:
+        #     self.state += 1
             
 
 if __name__ == "__main__":

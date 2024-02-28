@@ -1,10 +1,10 @@
 """!
 @file closed_loop_controller.py
 This file contains code that will implement the associated motor_driver and encoder_reader .py files
-for use with step_control.py to visually plot step responses with user input proportional gains
+for use with step_control.py to visually plot step responses with proportional gains.
 
 @author mecha02
-@date   20-Feb-2024
+@date   26-Feb-2024
 """
 
 import encoder_reader as enc
@@ -27,7 +27,8 @@ class control:
         self.state = 0
         self.steady_counter = 0
         self.print_counter = 0
-        self.position = 0
+        self.init_time = 0
+        self.position = []
     
     def set_setpoint(self, user_p):
         """! 
@@ -70,7 +71,7 @@ class control:
         pwm = self.gain*(self.setpoint - actual)
         return pwm
     
-    def cl_loop_response(self, motor, encoder, controller):
+    def cl_loop_response(self, motor, encoder, controller, gain):
         """!
         Function that runs the step reponse for the motor. This function
         implements a finite-state-machine and class variables to keep track of 
@@ -79,6 +80,7 @@ class control:
         @param motor motor driver object running the motor
         @param encoder encoder object returning the position of the motor
         @param controller controller object responsible for runnning functions within class
+        @param gain gain needed for following run
         """
         try:          
             # State 0: Step-response
@@ -99,7 +101,8 @@ class control:
             # Places the ending value of the step response 10 times
             # For cleaner plots
             elif self.state == 1:
-                position.append(actual)
+                actual = encoder.read()
+                self.position.append(actual)
                 # utime.sleep_ms(10)
                 
                 # Counter for this state
@@ -108,14 +111,14 @@ class control:
                 # Sets next state once counter reaches it's limit
                 if self.steady_counter == 10:
                     self.state += 1
+                    
+                    # Grabs initial time
+                    self.init_time = utime.ticks_ms()
             
             # State 2: Printing Step Response
-            elif self.state == 2:       
-                # Grabs initial time
-                init_time = utime.ticks_ms()
-                
+            elif self.state == 2:                             
                 # Prints time and encoder position in .CSV style format
-                print(f"{utime.ticks_ms() - init_time},{self.position[self.print_counter]}")
+                print(f"{utime.ticks_ms() - self.init_time},{self.position[self.print_counter]}")
                 
                 # Counter for this state
                 # Exits when printing raises an IndexError
@@ -133,14 +136,15 @@ class control:
                 self.position.clear()
                 
                 # Sets Kp value
-                controller.set_Kp(0.1)
+#                 controller.set_Kp(gain)
                 
                 # Zeros outs necessary values and parameters for next run 
                 # through
                 encoder.zero()
-                self.state = 0
+                self.state = 4
                 self.print_counter = 0
                 self.steady_counter = 0
+                
         
         # This portion only runs the first time through
         # This makes the motor run initially
@@ -195,13 +199,13 @@ if __name__ == "__main__":
     # Initializes Motor Controller
     controller = control()
        
-    controller.set_setpoint()
-    controller.set_Kp()
+    controller.set_setpoint(6900)
+    controller.set_Kp(0.07)
     position = []
     encoder.zero()
     
     while True:
-        controller.cl_loop_response(motor, encoder, controller, position)
+        controller.cl_loop_response(motor, encoder, controller)
     
     # Prompts user to input a controller gain
     # Initializes variables to be used in the while loop

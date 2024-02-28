@@ -1,31 +1,24 @@
 """!
-@file basic_tasks.py
-    This file contains a demonstration program that runs some tasks, an
-    inter-task shared variable, and a queue. The tasks don't really @b do
-    anything; the example just shows how these elements are created and run.
+@file main.py
+This file contains code that runs the step response of two motors simultaneously.
+The code uses a priority based scheduler, with different time periods for each task.
 
-@author JR Ridgely
-@date   2021-Dec-15 JRR Created from the remains of previous example
-@copyright (c) 2015-2021 by JR Ridgely and released under the GNU
-    Public License, Version 2. 
+@author mecha02
+@date   26-Feb-2024 Created from the remains of previous example 
 """
 
 import gc
 import pyb
 import cotask
-import task_share
 import encoder_reader as enc
 import motor_driver as moe
 import closed_loop_controller as closed
 
-def task1_fun(shares):
+def task1_fun():
     """!
     Task which runs the first motor using a scheduler. This function is run 
     every period interval.
-    @param shares A list holding the share and queue used by this task
     """
-    # Get references to the share and queue which have been passed to this task
-    my_share, my_queue = shares
 
     # Stuff copied over from last lab below
     # Code needed to initalize motor
@@ -66,25 +59,24 @@ def task1_fun(shares):
     
     # Sets gain and setpoint values and resets the encoder before running
     # the step response
-    controller.set_setpoint(6900)
-    controller.set_Kp(0.1)
+    gain = 0.03
+    controller.set_setpoint(10000)
+    controller.set_Kp(gain)
     encoder.zero()
     
     # Running step response
     while True:
-        controller.cl_loop_response(motor, encoder, controller)
+        controller.cl_loop_response(motor, encoder, controller, gain)
         
         yield 0
 
 
-def task2_fun(shares):
+def task2_fun():
     """!
     Task which runs the second motor using a scheduler. This function is run 
     every period interval.
-    @param shares A tuple of a share and queue from which this task gets data
     """
     # Get references to the share and queue which have been passed to this task
-    the_share, the_queue = shares
     
     # Stuff copied over from last lab below
     # Code needed to initalize motor
@@ -125,52 +117,42 @@ def task2_fun(shares):
     
     # Sets gain and setpoint values and resets the encoder before running
     # the step response
+    gain = 0.03
     controller_2.set_setpoint(6900)
-    controller_2.set_Kp(0.1)
+    controller_2.set_Kp(gain)
     encoder_2.zero()
     
     # Running step response
     while True:
-        controller_2.cl_loop_response(motor_2, encoder_2, controller_2)
+        controller_2.cl_loop_response(motor_2, encoder_2, controller_2, gain)
         
         yield 0
     
 
 
-# This code creates a share, a queue, and two tasks, then starts the tasks. The
-# tasks run until somebody presses ENTER, at which time the scheduler stops and
-# printouts show diagnostic information about the tasks, share, and queue.
+# This code creates two tasks, then starts the tasks. The
+# tasks run until somebody presses Ctrl+C
 if __name__ == "__main__":
 
-    # Create a share and a queue to test function and diagnostic printouts
-    share0 = task_share.Share('h', thread_protect=False, name="Share 0")
-    q0 = task_share.Queue('L', 16, thread_protect=False, overwrite=False,
-                          name="Queue 0")
-
-    # Create the tasks. If trace is enabled for any task, memory will be
-    # allocated for state transition tracing, and the application will run out
-    # of memory after a while and quit. Therefore, use tracing only for 
-    # debugging and set trace to False when it's not needed
-    task1 = cotask.Task(task1_fun, name="Task_1", priority=1, period=10,
-                        profile=True, trace=False, shares=(share0, q0))
-#     task2 = cotask.Task(task2_fun, name="Task_2", priority=2, period=50,
-#                          profile=True, trace=False, shares=(share0, q0))
+    # Create the tasks for the scheduler
+    task1 = cotask.Task(task1_fun, name="Task_1", priority=2, period=100,
+                        profile=True, trace=False)
+    task2 = cotask.Task(task2_fun, name="Task_2", priority=1, period=50,
+                         profile=True, trace=False)
+    
     cotask.task_list.append(task1)
-#     cotask.task_list.append(task2)
+    cotask.task_list.append(task2)
 
     # Run the memory garbage collector to ensure memory is as defragmented as
     # possible before the real-time scheduler is started
     gc.collect()
 
-    # Run the scheduler with the chosen scheduling algorithm. Quit if ^C pressed
+    # Run the scheduler with the chosen scheduling algorithm. Quit if Ctrl+C pressed
     while True:
         try:
             cotask.task_list.pri_sched()
         except KeyboardInterrupt:
             break
 
-    # Print a table of task data and a table of shared information data
+    # Print a table of task data 
     print('\n' + str (cotask.task_list))
-    print(task_share.show_all())
-    print(task1.get_trace())
-    print('')

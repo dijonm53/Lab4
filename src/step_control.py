@@ -8,7 +8,7 @@ set by the user
 This file uses a template for the GUI, given by Dr. John Ridgely
 
 @author mecha02
-@date   20-Feb-2024 
+@date   26-Feb-2024 
 """
 
 ## List of imports needed to run the program

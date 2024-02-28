@@ -13,7 +13,7 @@ import utime
 
 class control:
     """! 
-    This class implements the necessary code to implement a motor encoder
+    This class implements the necessary code to implement a motor controller
     for an ME405 kit. 
     """
     def __init__(self):
